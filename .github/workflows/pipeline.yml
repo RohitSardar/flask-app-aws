@@ -1,1 +1,51 @@
+name: Build and Deploy Flask App to EC2 via SSH
 
+on:
+  push:
+    branches:
+      - main  # Trigger on push to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # GitHub Actions runner
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v2  # Checkout the code from GitHub
+
+      # Step 2: Set up SSH Key for SSH access to EC2
+      - name: Set up SSH Key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+
+      # Step 3: Set up AWS CLI (optional, if needed for other steps)
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # Adjust region as needed
+
+      # Step 4: Deploy Flask App to EC2 (use dynamic IP or DNS)
+      - name: Deploy Flask App to EC2
+        run: |
+          # SSH into EC2 and deploy the app
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_DDNS_HOSTNAME }} << 'EOF'
+            # Navigate to the directory where you want to deploy the app
+            cd /opt/flask_web_app || mkdir -p /opt/flask_web_app && cd /opt/flask_web_app
+
+            # Clone the latest code or pull the latest changes
+            git clone https://github.com/${{ github.repository }} . || git pull origin main
+
+            # Build Docker image
+            docker build -t flask-web-app .
+
+            # Stop and remove any existing container
+            docker stop flask_web_container || true
+            docker rm flask_web_container || true
+
+            # Run the Flask app in a Docker container
+            docker run -d --name flask_web_container -p 5000:5000 flask-web-app
+          EOF
