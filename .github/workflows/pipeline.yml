@@ -40,7 +40,7 @@ jobs:
       - name: Deploy Flask App on EC2 Instance
         uses: appleboy/ssh-action@v0.1.1
         with:
-          host: 10.0.0.52
+          host: 54.170.110.187
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: 22
