@@ -36,28 +36,26 @@ jobs:
         run: |
           docker save flask-web-app:latest -o flask-web-app.tar
 
-      # Step 6: Install SSH Key for Accessing EC2
-      - name: Set up SSH keys
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-
-      # Step 7: Transfer Docker Image Tarball to EC2
-      - name: Transfer Docker Image to EC2 Instance
-        run: |
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} flask-web-app.tar ubuntu@54.170.110.187:/tmp
-
-      # Step 8: Deploy Docker Image on EC2 Instance
+      # Step 6: Deploy Docker Image to EC2 and Run Container
       - name: Deploy Flask App on EC2 Instance
         uses: appleboy/ssh-action@v0.1.1
         with:
-          host: 54.170.110.187
+          host: 10.0.0.52
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            # Load Docker image
-            docker load -i /tmp/flask-web-app.tar
+            # Create a temporary directory
+            mkdir -p /tmp/flask-app
+            
+            # Transfer Docker image tarball using base64 encoding
+            base64 -w 0 > /tmp/flask-app/docker-image.tar.b64 <<EOF
+            $(base64 -w 0 flask-web-app.tar)
+            EOF
+
+            # Decode and load Docker image
+            base64 -d /tmp/flask-app/docker-image.tar.b64 > /tmp/flask-app/flask-web-app.tar
+            docker load -i /tmp/flask-app/flask-web-app.tar
 
             # Stop and remove any existing container
             docker stop flask_web_container || true
@@ -66,5 +64,5 @@ jobs:
             # Run the Flask app in a new Docker container
             docker run -d --name flask_web_container -p 5000:5000 flask-web-app:latest
 
-            # Check if the container is running
-            docker ps
+            # Clean up
+            rm -rf /tmp/flask-app
