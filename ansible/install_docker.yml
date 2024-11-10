@@ -1,0 +1,42 @@
+---
+- name: Install Docker and configure it to start on boot
+  hosts: all
+  become: yes  # Ensure tasks run with root privileges
+
+  tasks:
+    # Step 1: Install required dependencies
+    - name: Install required dependencies for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    # Step 2: Add Docker GPG key
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    # Step 3: Add Docker APT repository
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+
+    # Step 4: Install Docker
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: yes
+
+    # Step 5: Enable Docker to start at boot
+    - name: Enable Docker to start at boot
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
