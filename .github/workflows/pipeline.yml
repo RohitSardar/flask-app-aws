@@ -46,4 +46,4 @@ jobs:
         'sudo docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest && \
          sudo docker stop app || true && \
          sudo docker rm app || true && \
-         sudo docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest'
+         sudo docker run -d --name app -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/app:latest'
