@@ -42,7 +42,7 @@ jobs:
 
     - name: Deploy Docker container to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no ubuntu@$54.170.110.187 \
+        ssh -o StrictHostKeyChecking=no ubuntu@54.170.110.187 \
         'sudo docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest && \
          sudo docker stop app || true && \
          sudo docker rm app || true && \
