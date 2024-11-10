@@ -1,68 +1,49 @@
-name: Continuous Integration Continuous Deployment
+name: CI/CD Pipeline for Docker App
 
 on:
   push:
     branches:
-      - main
+      - main  
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      # Step 2: Configure AWS Credentials
-      - name: Configure AWS Account
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
 
-      # Step 3: Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 4: Build Docker Image
-      - name: Build Docker Image
-        run: |
-          docker build -t flask-web-app .
+    - name: Build and push Docker image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/app:latest .
+        docker push ${{ secrets.DOCKER_USERNAME }}/app:latest
 
-      # Step 5: Save the Docker image as a tarball
-      - name: Save Docker Image as Tarball
-        run: |
-          docker save flask-web-app:latest -o flask-web-app.tar
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
 
-      # Step 6: Deploy Docker Image to EC2 and Run Container
-      - name: Deploy Flask App on EC2 Instance
-        uses: appleboy/ssh-action@v0.1.1
-        with:
-          host: 54.170.110.187
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            # Create a temporary directory
-            mkdir -p /tmp/flask-app
-            
-            # Transfer Docker image tarball using base64 encoding
-            base64 -w 0 > /tmp/flask-app/docker-image.tar.b64 <<EOF
-            $(base64 -w 0 flask-web-app.tar)
-            EOF
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-            # Decode and load Docker image
-            base64 -d /tmp/flask-app/docker-image.tar.b64 > /tmp/flask-app/flask-web-app.tar
-            docker load -i /tmp/flask-app/flask-web-app.tar
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_KEY }}
 
-            # Stop and remove any existing container
-            docker stop flask_web_container || true
-            docker rm flask_web_container || true
-
-            # Run the Flask app in a new Docker container
-            docker run -d --name flask_web_container -p 5000:5000 flask-web-app:latest
-
-            # Clean up
-            rm -rf /tmp/flask-app
+    - name: Deploy Docker container to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ubuntu@$54.170.110.187 \
+        'sudo docker pull ${{ secrets.DOCKER_USERNAME }}/app:latest && \
+         sudo docker stop app || true && \
+         sudo docker rm app || true && \
+         sudo docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/app:latest'
