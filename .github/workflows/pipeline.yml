@@ -8,40 +8,63 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v1
+      # Step 1: Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v2
 
-    - name: Configure AWS Account
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-west-1
+      # Step 2: Configure AWS Credentials
+      - name: Configure AWS Account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      # Step 3: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-    - name: Build Docker Image
-      run: |
+      # Step 4: Build Docker Image
+      - name: Build Docker Image
+        run: |
           docker build -t flask-web-app .
 
-    - name: Deploy Flask App to EC2 instance
-      uses: appleboy/ssh-action@v0.1.1
-      with:
+      # Step 5: Save the Docker image as a tarball
+      - name: Save Docker Image as Tarball
+        run: |
+          docker save flask-web-app:latest -o flask-web-app.tar
+
+      # Step 6: Install SSH Key for Accessing EC2
+      - name: Set up SSH keys
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+
+      # Step 7: Transfer Docker Image Tarball to EC2
+      - name: Transfer Docker Image to EC2 Instance
+        run: |
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} flask-web-app.tar ubuntu@10.0.0.52:/tmp
+
+      # Step 8: Deploy Docker Image on EC2 Instance
+      - name: Deploy Flask App on EC2 Instance
+        uses: appleboy/ssh-action@v0.1.1
+        with:
           host: 10.0.0.52
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            
+            # Load Docker image
+            docker load -i /tmp/flask-web-app.tar
+
             # Stop and remove any existing container
             docker stop flask_web_container || true
             docker rm flask_web_container || true
-            
+
             # Run the Flask app in a new Docker container
             docker run -d --name flask_web_container -p 5000:5000 flask-web-app:latest
-            
+
             # Check if the container is running
             docker ps
-        
