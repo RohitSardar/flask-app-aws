@@ -45,13 +45,13 @@ jobs:
       # Step 7: Transfer Docker Image Tarball to EC2
       - name: Transfer Docker Image to EC2 Instance
         run: |
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} flask-web-app.tar ubuntu@10.0.0.52:/tmp
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} flask-web-app.tar ubuntu@54.170.110.187:/tmp
 
       # Step 8: Deploy Docker Image on EC2 Instance
       - name: Deploy Flask App on EC2 Instance
         uses: appleboy/ssh-action@v0.1.1
         with:
-          host: 10.0.0.52
+          host: 54.170.110.187
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: 22
